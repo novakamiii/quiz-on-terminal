@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3 -m py_compile quiz_game.py)",
+      "Bash(python3 -m py_compile ui.py)",
+      "Bash(ls -la *.md)",
+      "Bash(python3:*)",
+      "Bash(ls:*)"
+    ]
+  }
+}
