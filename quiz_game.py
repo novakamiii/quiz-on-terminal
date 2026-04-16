@@ -10,7 +10,7 @@ import os
 from database import QuizDatabase
 from ui import QuizUI
 from quiz_manager import QuizManager
-from live_display import LiveQuizDisplay
+from live_display import SimpleQuizDisplay
 from rich.text import Text
 from rich.panel import Panel
 from rich.layout import Layout
@@ -43,7 +43,7 @@ class NeuralQuizSystem:
             "Display Quiz (Paper Mode)",
             "Create New Quiz",
             "Manage Quizzes",
-            "Exit System"
+            "Exit System",
         ]
 
         choice = self.ui.show_menu(options, "MAIN MENU")
@@ -71,7 +71,9 @@ class NeuralQuizSystem:
         self.ui.show_quiz_list(quizzes)
 
         while True:
-            quiz_id_input = self.ui.show_input_prompt("Enter quiz ID to display (or 0 to go back): ")
+            quiz_id_input = self.ui.show_input_prompt(
+                "Enter quiz ID to display (or 0 to go back): "
+            )
 
             if quiz_id_input == "0":
                 return
@@ -120,9 +122,9 @@ class NeuralQuizSystem:
                 self.ui.show_error("Invalid choice.")
 
         # After quiz display, show answer key
-        self.ui.show_message("\n" + "="*50)
+        self.ui.show_message("\n" + "=" * 50)
         self.ui.show_message("QUIZ COMPLETE")
-        self.ui.show_message("="*50)
+        self.ui.show_message("=" * 50)
         self.ui.wait_for_key()
 
         # Ask how to show answers
@@ -133,7 +135,9 @@ class NeuralQuizSystem:
         self.ui.show_message("2. Show all answers at once")
 
         while True:
-            answer_mode = self.ui.show_input_prompt("Select answer display mode [1-2]: ")
+            answer_mode = self.ui.show_input_prompt(
+                "Select answer display mode [1-2]: "
+            )
             if answer_mode == "1":
                 self.show_answers_one_by_one(questions)
                 break
@@ -149,28 +153,30 @@ class NeuralQuizSystem:
         self.ui.show_title(f"QUIZ: {quiz['name']}")
         self.ui.show_message(f"Description: {quiz['description'] or 'None'}")
         self.ui.show_message(f"Total Questions: {len(questions)}")
-        self.ui.show_timer_display(quiz['time_per_question'])
+        self.ui.show_timer_display(quiz["time_per_question"])
         self.ui.show_message()
-        self.ui.show_message("Note: Use 'One by One' mode for countdown timer and auto-advance")
+        self.ui.show_message(
+            "Note: Use 'One by One' mode for countdown timer and auto-advance"
+        )
         self.ui.show_message()
 
         for i, question in enumerate(questions, 1):
-            self.ui.show_message(f"\n{'='*50}")
+            self.ui.show_message(f"\n{'=' * 50}")
             self.ui.show_message(f"Question {i}/{len(questions)}")
-            self.ui.show_message(f"{'='*50}")
+            self.ui.show_message(f"{'=' * 50}")
 
             # Display question in large format
-            self.ui.show_large_question(question['question_text'], i, len(questions))
+            self.ui.show_large_question(question["question_text"], i, len(questions))
 
             # Display options in large format
-            if question['question_type'] == "multiple_choice" and question['options']:
-                self.ui.show_large_options(question['options'])
+            if question["question_type"] == "multiple_choice" and question["options"]:
+                self.ui.show_large_options(question["options"])
             else:
                 self.ui.show_message("(Write your answer on paper)")
 
-        self.ui.show_message(f"\n{'='*50}")
+        self.ui.show_message(f"\n{'=' * 50}")
         self.ui.show_message(f"END OF QUIZ - {len(questions)} questions total")
-        self.ui.show_message(f"{'='*50}")
+        self.ui.show_message(f"{'=' * 50}")
         self.ui.wait_for_key()
 
     def display_questions_one_by_one(self, quiz: dict, questions: list):
@@ -178,11 +184,13 @@ class NeuralQuizSystem:
         from rich.console import Console
 
         console = Console()
-        display = LiveQuizDisplay(console)
+        display = SimpleQuizDisplay()
 
         def on_finish(results):
             """Callback when quiz is finished."""
-            self.ui.show_message(f"\nQuiz completed! Viewed {results['current_index'] + 1}/{results['total_questions']} questions")
+            self.ui.show_message(
+                f"\nQuiz completed! Viewed {results['current_index'] + 1}/{results['total_questions']} questions"
+            )
 
         def on_question_change(index):
             """Callback when question changes."""
@@ -191,9 +199,9 @@ class NeuralQuizSystem:
         # Display the quiz with live updates
         display.display_quiz(
             questions=questions,
-            time_per_question=quiz['time_per_question'],
+            time_per_question=quiz["time_per_question"],
             on_finish=on_finish,
-            on_question_change=on_question_change
+            on_question_change=on_question_change,
         )
 
     def show_answers_one_by_one(self, questions: list):
@@ -209,18 +217,22 @@ class NeuralQuizSystem:
             self.ui.show_message(f"Question {current_index + 1}/{len(questions)}")
 
             # Display question in large format
-            self.ui.show_large_question(question['question_text'], current_index + 1, len(questions))
+            self.ui.show_large_question(
+                question["question_text"], current_index + 1, len(questions)
+            )
 
             # Display answer in large format
-            if question['question_type'] == "multiple_choice":
-                answer_letter = question['correct_answer']
-                answer_index = ord(answer_letter) - ord('A')
-                if question['options'] and answer_index < len(question['options']):
-                    answer_text = f"{answer_letter}. {question['options'][answer_index]}"
+            if question["question_type"] == "multiple_choice":
+                answer_letter = question["correct_answer"]
+                answer_index = ord(answer_letter) - ord("A")
+                if question["options"] and answer_index < len(question["options"]):
+                    answer_text = (
+                        f"{answer_letter}. {question['options'][answer_index]}"
+                    )
                 else:
                     answer_text = answer_letter
             else:
-                answer_text = question['correct_answer']
+                answer_text = question["correct_answer"]
 
             self.ui.show_large_answer(answer_text, "Correct Answer")
 
@@ -240,18 +252,18 @@ class NeuralQuizSystem:
                 tty.setraw(sys.stdin.fileno())
                 char = sys.stdin.read(1)
 
-                if char == '\x1b':
+                if char == "\x1b":
                     # Arrow key
                     next_char = sys.stdin.read(1)
-                    if next_char == '[':
+                    if next_char == "[":
                         arrow_char = sys.stdin.read(1)
-                        if arrow_char == 'D':  # Left
+                        if arrow_char == "D":  # Left
                             if current_index > 0:
                                 current_index -= 1
-                        elif arrow_char == 'C':  # Right
+                        elif arrow_char == "C":  # Right
                             if current_index < len(questions) - 1:
                                 current_index += 1
-                elif char in ['q', 'Q']:
+                elif char in ["q", "Q"]:
                     break
             finally:
                 termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_settings)
@@ -262,28 +274,30 @@ class NeuralQuizSystem:
         self.ui.show_title("ANSWER KEY - ALL QUESTIONS")
 
         for i, question in enumerate(questions, 1):
-            self.ui.show_message(f"\n{'='*50}")
+            self.ui.show_message(f"\n{'=' * 50}")
             self.ui.show_message(f"Question {i}: {question['question_text'][:50]}...")
-            self.ui.show_message(f"{'='*50}")
+            self.ui.show_message(f"{'=' * 50}")
 
             # Display answer in large format
-            if question['question_type'] == "multiple_choice":
-                answer_letter = question['correct_answer']
-                answer_index = ord(answer_letter) - ord('A')
-                if question['options'] and answer_index < len(question['options']):
-                    answer_text = f"{answer_letter}. {question['options'][answer_index]}"
+            if question["question_type"] == "multiple_choice":
+                answer_letter = question["correct_answer"]
+                answer_index = ord(answer_letter) - ord("A")
+                if question["options"] and answer_index < len(question["options"]):
+                    answer_text = (
+                        f"{answer_letter}. {question['options'][answer_index]}"
+                    )
                 else:
                     answer_text = answer_letter
             else:
-                answer_text = question['correct_answer']
+                answer_text = question["correct_answer"]
 
             self.ui.show_large_answer(answer_text, "Answer")
             self.ui.show_message(f"Points: {question['points']}")
 
-        self.ui.show_message(f"\n{'='*50}")
+        self.ui.show_message(f"\n{'=' * 50}")
         self.ui.show_message(f"Total Questions: {len(questions)}")
         self.ui.show_message(f"Total Points: {sum(q['points'] for q in questions)}")
-        self.ui.show_message(f"{'='*50}")
+        self.ui.show_message(f"{'=' * 50}")
         self.ui.wait_for_key()
 
     def create_quiz_menu(self):
@@ -314,7 +328,7 @@ class NeuralQuizSystem:
                 "View Quiz Details",
                 "Edit Quiz Time",
                 "Delete Quiz",
-                "Back to Main Menu"
+                "Back to Main Menu",
             ]
 
             choice = self.ui.show_menu(options, "MANAGE QUIZZES")
@@ -357,7 +371,9 @@ class NeuralQuizSystem:
 
     def select_quiz(self, quizzes: list, action: str) -> int:
         """Helper to select a quiz from list."""
-        quiz_id_input = self.ui.show_input_prompt(f"Enter quiz ID to {action} (or 0 to cancel): ")
+        quiz_id_input = self.ui.show_input_prompt(
+            f"Enter quiz ID to {action} (or 0 to cancel): "
+        )
 
         if quiz_id_input == "0":
             return None

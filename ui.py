@@ -14,6 +14,7 @@ from rich.live import Live
 from rich import box
 from typing import List, Optional
 import time
+import os
 
 
 class CustomBox(Box):
@@ -118,21 +119,6 @@ class QuizUI:
         question_text_large = Text(question_text, style="bold white on_black")
         question_panel = Panel(
             question_text_large, title="[QUESTION]", border_style="cyan", padding=(0, 1)
-        )
-        self.console.print(question_panel)
-        self.console.print()
-
-        # Options for multiple choice - Make them larger too
-        if question_type == "multiple_choice" and options:
-            options_table = Table(
-                show_header=False, box=box.SIMPLE, border_style="cyan", padding=(0, 1)
-            )
-        self.console.print()
-
-        # Question - Make it larger
-        question_text_large = Text(question_text, style="bold white on_black")
-        question_panel = Panel(
-            question_text_large, title="[QUESTION]", border_style="cyan", padding=(0, 2)
         )
         self.console.print(question_panel)
         self.console.print()
@@ -284,8 +270,32 @@ class QuizUI:
 
     def wait_for_key(self, message: str = "Press any key to continue..."):
         """Wait for user to press a key."""
+        import sys
+        import tty
+        import termios
+
         self.console.print(f"[dim]{message}[/dim]")
-        input()
+
+        try:
+            # Save terminal settings
+            old_settings = None
+            if hasattr(sys.stdin, "fileno") and os.isatty(sys.stdin.fileno()):
+                old_settings = termios.tcgetattr(sys.stdin)
+
+            try:
+                tty.setraw(sys.stdin.fileno())
+                # Read a single character
+                sys.stdin.read(1)
+            except:
+                # If terminal operations fail, just wait a bit
+                time.sleep(2)
+            finally:
+                # Restore terminal settings if they were saved
+                if old_settings:
+                    termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_settings)
+        except:
+            # If terminal operations fail completely, just wait a bit
+            time.sleep(2)
 
     def show_timer_warning(self, time_remaining: int):
         """Show warning when time is running low."""

@@ -41,8 +41,8 @@ class QuizGame:
         self.answers = {}
         self.score = 0
         self.start_time = time.time()
-        self.time_per_question = quiz['time_per_question']
-        self.quiz_type = quiz['quiz_type']
+        self.time_per_question = quiz["time_per_question"]
+        self.quiz_type = quiz["quiz_type"]
 
         if not self.questions:
             self.ui.show_error("Quiz has no questions.")
@@ -101,10 +101,10 @@ class QuizGame:
         self.ui.show_question(
             question_num,
             total_questions,
-            question['question_text'],
-            question['options'],
+            question["question_text"],
+            question["options"],
             self.time_remaining,
-            question['question_type']
+            question["question_type"],
         )
 
     def start_timer(self):
@@ -151,41 +151,37 @@ class QuizGame:
                 char = sys.stdin.read(1)
 
                 # Check for arrow keys (escape sequence)
-                if char == '\x1b':
+                if char == "\x1b":
                     # Read next two characters
                     next_char = sys.stdin.read(1)
-                    if next_char == '[':
+                    if next_char == "[":
                         arrow_char = sys.stdin.read(1)
-                        if arrow_char == 'C':  # Right arrow
+                        if arrow_char == "C":  # Right arrow
                             self.stop_timer()
                             return "NEXT"
-                        elif arrow_char == 'D':  # Left arrow
+                        elif arrow_char == "D":  # Left arrow
                             self.stop_timer()
                             return "PREV"
 
                 # Check for quit
-                elif char == 'q' or char == 'Q':
+                elif char == "q" or char == "Q":
                     self.stop_timer()
                     return "QUIT"
 
                 # Check for finish
-                elif char == 'f' or char == 'F':
+                elif char == "f" or char == "F":
                     self.stop_timer()
                     return "FINISH"
 
                 # Regular input
-                elif char in ['A', 'B', 'C', 'D', 'a', 'b', 'c', 'd']:
+                elif char in ["A", "B", "C", "D", "a", "b", "c", "d"]:
                     self.stop_timer()
                     return char.upper()
 
                 # Enter key
-                elif char == '\r' or char == '\n':
-                    # For enumeration, we need to read the full line
-                    termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_settings)
-                    answer = input().strip()
-                    tty.setraw(sys.stdin.fileno())
+                elif char == "\r" or char == "\n":
                     self.stop_timer()
-                    return answer
+                    return "NEXT"
 
         finally:
             # Restore terminal settings
@@ -216,7 +212,7 @@ class QuizGame:
         if unanswered:
             self.ui.show_warning(f"You have {len(unanswered)} unanswered question(s).")
             proceed = self.ui.show_input_prompt("Finish anyway? (y/n): ").lower()
-            if proceed != 'y':
+            if proceed != "y":
                 return False
 
         # Calculate score
@@ -224,16 +220,15 @@ class QuizGame:
 
         # Display results
         time_taken = self.end_time - self.start_time if self.end_time else 0
-        total_points = sum(q['points'] for q in self.questions)
-        correct_count = sum(1 for i, q in enumerate(self.questions)
-                          if i in self.answers and self.answers[i] == q['correct_answer'])
+        total_points = sum(q["points"] for q in self.questions)
+        correct_count = sum(
+            1
+            for i, q in enumerate(self.questions)
+            if i in self.answers and self.answers[i] == q["correct_answer"]
+        )
 
         self.ui.show_results(
-            self.score,
-            total_points,
-            correct_count,
-            len(self.questions),
-            time_taken
+            self.score, total_points, correct_count, len(self.questions), time_taken
         )
 
         # Save result to database
@@ -252,10 +247,10 @@ class QuizGame:
         for i, question in enumerate(self.questions):
             if i in self.answers:
                 user_answer = self.answers[i]
-                correct_answer = question['correct_answer']
+                correct_answer = question["correct_answer"]
 
                 if user_answer == correct_answer:
-                    self.score += question['points']
+                    self.score += question["points"]
 
     def get_score(self) -> int:
         """Get current score."""
