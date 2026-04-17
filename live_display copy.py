@@ -17,187 +17,6 @@ from rich import box
 from rich.align import Align
 
 
-# ---------------------------------------------------------------------------
-# Sound Manager
-# ---------------------------------------------------------------------------
-
-import subprocess
-
-class SoundManager:
-    """Zero-dependency audio via system CLI players (subprocess).
-
-    No pip installs needed. Tries players in priority order and fails
-    silently if none are found or a file is missing — the quiz still
-    works in headless / CI environments.
-
-    Supported players (checked in order):
-      Linux  : mpg123 → ffplay → mpv → cvlc
-      macOS  : afplay (built-in)
-      Windows: PowerShell + WindowsMediaPlayer (built-in)
-    """
-
-    # (player-binary, one-shot-args-fn, loop-args-fn)
-    _LINUX_PLAYERS = [
-        (
-            "mpg123",
-            lambda p: ["mpg123", "-q", p],
-            lambda p: ["mpg123", "-q", "--loop", "-1", p],
-        ),
-        (
-            "ffplay",
-            lambda p: ["ffplay", "-nodisp", "-autoexit", "-loglevel", "quiet", p],
-            lambda p: ["ffplay", "-nodisp", "-loglevel", "quiet", "-loop", "0", p],
-        ),
-        (
-            "mpv",
-            lambda p: ["mpv", "--no-video", "--really-quiet", p],
-            lambda p: ["mpv", "--no-video", "--really-quiet", "--loop=inf", p],
-        ),
-        (
-            "cvlc",
-            lambda p: ["cvlc", "--play-and-exit", "-q", p],
-            lambda p: ["cvlc", "--loop", "-q", p],
-        ),
-    ]
-
-    def __init__(
-        self,
-        tick_path: str = "sfx/tick.mp3",
-        end_path: str = "sfx/end.mp3",
-    ):
-        self._tick_path = tick_path
-        self._end_path = end_path
-        self._tick_proc: Optional[subprocess.Popen] = None
-        self._end_proc: Optional[subprocess.Popen] = None
-        # For afplay (macOS) which has no native loop flag, we loop in a thread
-        self._end_loop_stop = threading.Event()
-        self._end_loop_thread: Optional[threading.Thread] = None
-
-        self._system = platform.system()
-        self._player = self._detect_player()  # binary name, or "afplay"/"powershell"
-
-    # ------------------------------------------------------------------
-    # Player detection
-    # ------------------------------------------------------------------
-
-    def _detect_player(self) -> Optional[str]:
-        if self._system == "Darwin":
-            return "afplay"                      # always present on macOS
-        if self._system == "Windows":
-            return "powershell"                  # always present on Windows
-        # Linux / BSD — walk the priority list
-        for binary, _, _ in self._LINUX_PLAYERS:
-            if shutil.which(binary):
-                return binary
-        return None                              # no player found — silent mode
-
-    # ------------------------------------------------------------------
-    # Internal spawn helpers
-    # ------------------------------------------------------------------
-
-    def _build_args(self, path: str, loop: bool) -> Optional[list]:
-        """Return the argv list for the detected player, or None."""
-        if not self._player or not os.path.exists(path):
-            return None
-        if self._system == "Linux":
-            for binary, one_shot, looped in self._LINUX_PLAYERS:
-                if binary == self._player:
-                    return looped(path) if loop else one_shot(path)
-        if self._player == "afplay":
-            # afplay has no loop flag — caller must re-spawn in a thread
-            return ["afplay", path]
-        if self._player == "powershell":
-            abs_path = os.path.abspath(path).replace("\\", "\\\\")
-            ps = (
-                "Add-Type -AssemblyName presentationCore; "
-                f"$mp = [System.Windows.Media.MediaPlayer]::new(); "
-                f"$mp.Open([uri]'{abs_path}'); "
-                "$mp.Play(); Start-Sleep -s 60"
-            )
-            return ["powershell", "-NoProfile", "-NonInteractive", "-c", ps]
-        return None
-
-    def _spawn(self, path: str, loop: bool = False) -> Optional[subprocess.Popen]:
-        args = self._build_args(path, loop)
-        if not args:
-            return None
-        try:
-            return subprocess.Popen(
-                args,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-            )
-        except Exception:
-            return None
-
-    @staticmethod
-    def _kill(proc: Optional[subprocess.Popen]):
-        """Terminate a process gracefully, then forcefully."""
-        if proc and proc.poll() is None:
-            try:
-                proc.terminate()
-                proc.wait(timeout=1)
-            except Exception:
-                try:
-                    proc.kill()
-                except Exception:
-                    pass
-
-    # ------------------------------------------------------------------
-    # Tick sound  (one-shot; won't overlap itself)
-    # ------------------------------------------------------------------
-
-    def play_tick(self):
-        """Play tick once. Skips if the previous tick is still playing."""
-        if self._tick_proc and self._tick_proc.poll() is None:
-            return                               # still playing — don't overlap
-        self._tick_proc = self._spawn(self._tick_path, loop=False)
-
-    def stop_tick(self):
-        """Stop the tick immediately (timer expired or question changed)."""
-        self._kill(self._tick_proc)
-        self._tick_proc = None
-
-    # ------------------------------------------------------------------
-    # End / Time's-up sound  (loops until explicitly stopped)
-    # ------------------------------------------------------------------
-
-    def play_end(self):
-        """Start the end sound looping. Call stop_end() to silence it."""
-        self.stop_end()                          # clean up any previous run
-        if self._player == "afplay":
-            # afplay has no loop flag — drive it from a daemon thread
-            self._end_loop_stop.clear()
-            def _loop():
-                while not self._end_loop_stop.is_set():
-                    proc = self._spawn(self._end_path, loop=False)
-                    if proc is None:
-                        break
-                    self._end_proc = proc
-                    proc.wait()
-            self._end_loop_thread = threading.Thread(target=_loop, daemon=True)
-            self._end_loop_thread.start()
-        else:
-            self._end_proc = self._spawn(self._end_path, loop=True)
-
-    def stop_end(self):
-        """Stop the end sound (called after the user presses ENTER)."""
-        self._end_loop_stop.set()               # signal afplay loop thread to exit
-        self._kill(self._end_proc)
-        self._end_proc = None
-
-    # ------------------------------------------------------------------
-
-    def stop_all(self):
-        """Silence everything at once."""
-        self.stop_tick()
-        self.stop_end()
-
-
-# ---------------------------------------------------------------------------
-# Input handler
-# ---------------------------------------------------------------------------
-
 class SimpleInput:
     """Simple input handler."""
 
@@ -265,17 +84,12 @@ class SimpleInput:
                 pass
 
 
-# ---------------------------------------------------------------------------
-# Quiz display
-# ---------------------------------------------------------------------------
-
 class SimpleQuizDisplay:
     """Quiz display using main UI pattern."""
 
     def __init__(self):
         self.console = Console()
         self.input_handler = SimpleInput()
-        self.sounds = SoundManager()           # ← sound manager attached here
 
     def clear_screen(self):
         # Use Rich's console clear - works across terminals
@@ -458,9 +272,6 @@ class SimpleQuizDisplay:
         self.console.print(Align.center(instruction))
         self.console.print()
 
-        # ── Play end sound (loops until ENTER is pressed) ──────────────
-        self.sounds.play_end()
-
         # Clear any buffered input before waiting
         try:
             import select
@@ -473,10 +284,8 @@ class SimpleQuizDisplay:
             # Wait for user to press ENTER
             user_input = input()
 
-            # ── ENTER pressed → stop end sound immediately ──────────────
-            self.sounds.stop_end()
-
             # Clear any remaining input that might be buffered
+            # This prevents the ENTER key from being processed again
             if hasattr(select, "select"):
                 while select.select([sys.stdin], [], [], 0)[0]:
                     try:
@@ -484,10 +293,8 @@ class SimpleQuizDisplay:
                     except:
                         break
         except (EOFError, KeyboardInterrupt):
-            self.sounds.stop_end()
             time.sleep(2)
         except Exception:
-            self.sounds.stop_end()
             # If input() fails, just wait a bit and continue
             time.sleep(2)
 
@@ -529,18 +336,11 @@ class SimpleQuizDisplay:
                         and state["time_remaining"] > 0
                     ):
                         state["time_remaining"] -= 1
-
-                        # ── Tick sound every second in the last 10 seconds ──
-                        if state["time_remaining"] <= 10 and state["time_remaining"] > 0:
-                            self.sounds.play_tick()
-
                     elif (
                         state["timer_running"]
                         and not state["paused"]
                         and state["time_remaining"] == 0
                     ):
-                        # ── Timer expired → stop tick before showing TIME'S UP ──
-                        self.sounds.stop_tick()
                         state["action"] = "TIME_UP"
                         # Clear any buffered input to prevent double processing
                         try:
@@ -566,14 +366,12 @@ class SimpleQuizDisplay:
                         if key_lower == "r" and state["current_index"] > 0:
                             state["current_index"] -= 1
                             state["time_remaining"] = time_per_question
-                            self.sounds.stop_tick()   # reset tick on question change
                         elif (
                             key_lower == "n"
                             and state["current_index"] < len(questions) - 1
                         ):
                             state["current_index"] += 1
                             state["time_remaining"] = time_per_question
-                            self.sounds.stop_tick()   # reset tick on question change
                         elif key_lower == "h":  # Hide interface functionality - also pauses timer
                             state["hidden"] = not state.get("hidden", False)
                             state["paused"] = state["hidden"]  # Pause when hidden
@@ -583,17 +381,14 @@ class SimpleQuizDisplay:
                                 # Unhiding when unpausing if currently hidden
                                 state["hidden"] = False
                         elif key_lower == "f":
-                            self.sounds.stop_all()
                             state["timer_running"] = False
                         elif key_lower == "q":
-                            self.sounds.stop_all()
                             state["timer_running"] = False
                         elif key and key.isdigit():
                             q_num = int(key)
                             if 1 <= q_num <= min(9, len(questions)):
                                 state["current_index"] = q_num - 1
                                 state["time_remaining"] = time_per_question
-                                self.sounds.stop_tick()   # reset tick on question jump
             except Exception:
                 pass
 
@@ -656,7 +451,6 @@ class SimpleQuizDisplay:
         finally:
             with state_lock:
                 state["timer_running"] = False
-            self.sounds.stop_all()        # ← always clean up audio on exit
             try:
                 self.input_handler.cleanup()
             except:
