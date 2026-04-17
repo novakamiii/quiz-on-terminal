@@ -105,9 +105,9 @@ class QuizUI:
         self.clear_screen()
 
         # Header with progress
-        header = f"QUESTION {question_num}/{total_questions}"
+        header = f"{chr(0xF05F)} QUESTION {question_num}/{total_questions}"  # fa-regular fa-book (U+F05F)
         if time_remaining is not None:
-            header += f" | TIME: {time_remaining}s"
+            header += f" | {chr(0xF252)} TIME: {time_remaining}s"  # fa-regular fa-hourglass (U+F252)
 
         header_text = Text(header, style="bold cyan")
         self.console.print(
@@ -118,7 +118,10 @@ class QuizUI:
         # Question - Make it larger
         question_text_large = Text(question_text, style="bold white on_black")
         question_panel = Panel(
-            question_text_large, title="[QUESTION]", border_style="cyan", padding=(0, 1)
+            question_text_large,
+            title=f"{chr(0xF07E)} [QUESTION]",
+            border_style="cyan",
+            padding=(0, 1),  # fa-regular fa-box-archive (U+F07E)
         )
         self.console.print(question_panel)
         self.console.print()
@@ -140,9 +143,9 @@ class QuizUI:
 
         # Instructions
         if question_type == "multiple_choice":
-            instructions = "Enter your answer (A, B, C, D) or use ← → to navigate"
+            instructions = f"{chr(0xF304)} Enter your answer (A, B, C, D) or use ← → to navigate"  # fa-regular fa-pen-to-square (U+F304)
         else:
-            instructions = "Type your answer or use ← → to navigate"
+            instructions = f"{chr(0xF304)} Type your answer or use ← → to navigate"  # fa-regular fa-pen-to-square (U+F304)
 
         self.console.print(Align.center(Text(instructions, style="dim")))
         self.console.print()
@@ -173,26 +176,51 @@ class QuizUI:
         results_table.add_column("Metric", style="cyan", width=20)
         results_table.add_column("Value", style="white")
 
-        results_table.add_row("Score", f"{score}/{total_points}")
-        results_table.add_row("Percentage", f"{percentage:.1f}%")
-        results_table.add_row("Correct Answers", f"{correct_answers}/{total_questions}")
-        results_table.add_row("Time Taken", f"{time_taken:.1f}s")
+        results_table.add_row(
+            f"{chr(0xF201)} Score", f"{score}/{total_points}"
+        )  # fa-regular fa-chart-line (U+F201)
+        results_table.add_row(
+            f"{chr(0xF080)} Percentage", f"{percentage:.1f}%"
+        )  # fa-regular fa-chart-column (U+F080)
+        results_table.add_row(
+            f"{chr(0xF058)} Correct Answers", f"{correct_answers}/{total_questions}"
+        )  # fa-regular fa-circle-check (U+F058)
+        results_table.add_row(
+            f"{chr(0xF2F2)} Time Taken", f"{time_taken:.1f}s"
+        )  # fa-regular fa-stopwatch (U+F2F2)
 
         self.console.print(Align.center(results_table))
         self.console.print()
 
         # Performance message
         if percentage >= 80:
-            message = "🎯 EXCELLENT! Neural pathways optimized!"
+            message = f"{chr(0xF579)} EXCELLENT! Neural pathways optimized!"  # fa-regular fa-face-smile-beam (U+F579)
             style = "bold green"
         elif percentage >= 60:
-            message = "⚡ GOOD! System functioning within parameters."
+            message = f"{chr(0xF10C)} GOOD! System functioning within parameters."  # fa-regular fa-circle (U+F10C)
             style = "bold yellow"
         elif percentage >= 40:
-            message = "⚠️ ADEQUATE. Recalibration recommended."
+            message = f"{chr(0xF071)} ADEQUATE. Recalibration recommended."  # fa-regular fa-triangle-exclamation (U+F071)
             style = "bold orange"
         else:
-            message = "🔴 CRITICAL. System requires immediate attention."
+            message = f"{chr(0xF05E)} CRITICAL. System requires immediate attention."  # fa-regular fa-circle-xmark (U+F05E)
+            style = "bold red"
+
+        self.console.print(Align.center(Text(message, style=style)))
+        self.console.print()
+
+        # Performance message
+        if percentage >= 80:
+            message = f"{chr(0x1F389)} EXCELLENT! Neural pathways optimized!"  # 🎉 Party popper
+            style = "bold green"
+        elif percentage >= 60:
+            message = f"{chr(0x1F4A5)} GOOD! System functioning within parameters."  # 💥 Collision
+            style = "bold yellow"
+        elif percentage >= 40:
+            message = f"{chr(0x26A0)} ADEQUATE. Recalibration recommended."  # ⚠️ Warning
+            style = "bold orange"
+        else:
+            message = f"{chr(0x1F6AB)} CRITICAL. System requires immediate attention."  # 🚫 No entry
             style = "bold red"
 
         self.console.print(Align.center(Text(message, style=style)))
@@ -244,19 +272,27 @@ class QuizUI:
 
     def show_error(self, message: str):
         """Display an error message."""
-        self.console.print(f"[red]ERROR: {message}[/red]")
+        self.console.print(
+            f"[red]{chr(0xF05E)} ERROR: {message}[/red]"
+        )  # fa-regular fa-circle-xmark (U+F05E)
 
     def show_success(self, message: str):
         """Display a success message."""
-        self.console.print(f"[green]✓ {message}[/green]")
+        self.console.print(
+            f"[green]{chr(0xF058)} {message}[/green]"
+        )  # fa-regular fa-circle-check (U+F058)
 
     def show_warning(self, message: str):
         """Display a warning message."""
-        self.console.print(f"[yellow]⚠ {message}[/yellow]")
+        self.console.print(
+            f"[yellow]{chr(0xF071)} {message}[/yellow]"
+        )  # fa-regular fa-triangle-exclamation (U+F071)
 
     def show_loading(self, message: str = "Processing..."):
         """Show loading animation."""
-        self.console.print(f"[cyan]⏳ {message}[/cyan]")
+        self.console.print(
+            f"[cyan]{chr(0xF252)} {message}[/cyan]"
+        )  # fa-regular fa-hourglass (U+F252)
 
     def show_progress(self, current: int, total: int, message: str = ""):
         """Show progress bar."""
@@ -265,7 +301,9 @@ class QuizUI:
         filled = int(bar_length * current / total) if total > 0 else 0
         bar = "█" * filled + "░" * (bar_length - filled)
 
-        self.console.print(f"[cyan]{message}[/cyan]")
+        self.console.print(
+            f"[cyan]{chr(0xF0C6)} {message}[/cyan]"  # fa-regular fa-file-lines (U+F0C6)
+        )
         self.console.print(f"[cyan][{bar}] {percentage:.0f}%[/cyan]")
 
     def wait_for_key(self, message: str = "Press any key to continue..."):
@@ -301,7 +339,7 @@ class QuizUI:
         """Show warning when time is running low."""
         if time_remaining <= 5:
             self.console.print(
-                f"[red blink]⏰ TIME RUNNING LOW: {time_remaining}s![/red blink]"
+                f"[red blink]{chr(0xF253)} TIME RUNNING LOW: {time_remaining}s![/red blink]"  # fa-regular fa-hourglass-end (U+F253)
             )
 
     def show_large_text(self, text: str, style: str = "bold white"):
@@ -325,7 +363,10 @@ class QuizUI:
         """Display an answer in large format."""
         answer_large = Text(answer_text, style="bold green on_black")
         answer_panel = Panel(
-            answer_large, title=f"[{label}]", border_style="green", padding=(0, 1)
+            answer_large,
+            title=f"{chr(0x2705)} [{label}]",
+            border_style="green",
+            padding=(0, 1),  # ✅ White heavy check mark
         )
         self.console.print(answer_panel)
         self.console.print()
@@ -337,9 +378,9 @@ class QuizUI:
         total_questions: int = None,
     ):
         """Display timer information for paper mode."""
-        timer_text = f"⏱️  Time per Question: {time_per_question} seconds"
+        timer_text = f"{chr(0xF252)} Time per Question: {time_per_question} seconds"  # fa-regular fa-hourglass (U+F252)
         if current_question is not None and total_questions is not None:
-            timer_text += f" | Question {current_question}/{total_questions}"
+            timer_text += f" | {chr(0xF0C6)} Question {current_question}/{total_questions}"  # fa-regular fa-file-lines (U+F0C6)
 
         timer_panel = Panel(
             Text(timer_text, style="bold yellow"),
@@ -363,7 +404,7 @@ class QuizUI:
             style = "bold green"
 
         return Text(
-            f"⏱️  Time Remaining: {time_remaining}s | Question {current_question}/{total_questions}",
+            f"{chr(0xF252)} Time Remaining: {time_remaining}s | {chr(0xF0C6)} Question {current_question}/{total_questions}",  # fa-regular fa-hourglass and fa-regular fa-file-lines (U+F252, U+F0C6)
             style=style,
         )
 
@@ -420,8 +461,12 @@ class QuizUI:
             border_style = "green"
 
         timer_text = Text(
-            f"⏱️  Time Remaining: {time_remaining}s | Question {current_question}/{total_questions}",
+            f"{chr(0xF252)} Time Remaining: {time_remaining}s | {chr(0xF0C6)} Question {current_question}/{total_questions}",  # fa-regular fa-hourglass and fa-regular fa-file-lines (U+F252, U+F0C6)
             style=style,
+        )
+
+        return Panel(
+            timer_text, box=box.DOUBLE, border_style=border_style, padding=(0, 1)
         )
 
         return Panel(
@@ -506,8 +551,12 @@ class QuizUI:
             border_style = "green"
 
         timer_text = Text(
-            f"⏱️  Time Remaining: {time_remaining}s | Question {current_question}/{total_questions}",
+            f"{chr(0xF252)} Time Remaining: {time_remaining}s | {chr(0xF0C6)} Question {current_question}/{total_questions}",  # fa-regular fa-hourglass and fa-regular fa-file-lines (U+F252, U+F0C6)
             style=style,
+        )
+
+        return Panel(
+            timer_text, box=box.DOUBLE, border_style=border_style, padding=(0, 1)
         )
 
         return Panel(
@@ -559,8 +608,63 @@ class QuizUI:
 
         # Instructions
         instructions = Text(
-            "← Previous | → Next | F Finish | ⏱️ Auto-advance on timeout", style="dim"
+            "← Previous | → Next | F Finish | "
+            + chr(0xF252)
+            + " Auto-advance on timeout",
+            style="dim",
+        )  # fa-regular fa-hourglass (U+F252)
+
+        # Combine all sections
+        from rich.console import Group
+
+        content = Group(
+            timer_panel,
+            Text(),
+            question_panel,
+            Text(),
+            options_renderable,
+            Text(),
+            Align.center(instructions),
         )
+
+        return Panel(
+            content,
+            title=f"[bold cyan]{quiz_name}[/bold cyan]",
+            border_style="cyan",
+            padding=(1, 2),
+        )
+
+        # Question section
+        question_panel = Panel(
+            Text(question_text, style="bold white on_black"),
+            title="[QUESTION]",
+            border_style="cyan",
+            padding=(0, 1),
+        )
+
+        # Options section
+        if options:
+            options_table = Table(
+                show_header=False, box=box.SIMPLE, border_style="cyan", padding=(0, 1)
+            )
+            options_table.add_column("Key", style="bold cyan", width=6)
+            options_table.add_column("Option", style="bold white")
+
+            for i, option in enumerate(options, 1):
+                key = chr(64 + i)
+                options_table.add_row(f"[{key}]", option)
+
+            options_renderable = Align.center(options_table)
+        else:
+            options_renderable = Text("(Write your answer on paper)", style="dim")
+
+        # Instructions
+        instructions = Text(
+            "← Previous | → Next | F Finish | "
+            + chr(0x23F3)
+            + " Auto-advance on timeout",
+            style="dim",
+        )  # ⏳ Hourglass
 
         # Combine all sections
         from rich.console import Group

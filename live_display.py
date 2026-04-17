@@ -40,7 +40,7 @@ class SimpleInput:
                 self.termios = termios
                 self.tty = tty
                 # Only try to get terminal attributes if stdin is a terminal
-                if hasattr(sys.stdin, 'fileno') and os.isatty(sys.stdin.fileno()):
+                if hasattr(sys.stdin, "fileno") and os.isatty(sys.stdin.fileno()):
                     self.old_settings = termios.tcgetattr(sys.stdin)
                     tty.setraw(sys.stdin.fileno())
             except:
@@ -49,14 +49,18 @@ class SimpleInput:
     def get_key(self):
         try:
             if self.system == "Windows":
-                if hasattr(self, 'msvcrt') and self.msvcrt.kbhit():
+                if hasattr(self, "msvcrt") and self.msvcrt.kbhit():
                     return self.msvcrt.getch().decode("utf-8")
             else:
                 import select
                 import sys
 
                 # Check if there's input available and stdin is a terminal
-                if hasattr(sys.stdin, 'fileno') and os.isatty(sys.stdin.fileno()) and select.select([sys.stdin], [], [], 0)[0]:
+                if (
+                    hasattr(sys.stdin, "fileno")
+                    and os.isatty(sys.stdin.fileno())
+                    and select.select([sys.stdin], [], [], 0)[0]
+                ):
                     # Read the input
                     char = sys.stdin.read(1)
                     # If it's a newline (ENTER key), consume it and return None
@@ -72,7 +76,7 @@ class SimpleInput:
         if self.system != "Windows" and self.old_settings:
             try:
                 # Only try to restore terminal attributes if stdin is a terminal
-                if hasattr(sys.stdin, 'fileno') and os.isatty(sys.stdin.fileno()):
+                if hasattr(sys.stdin, "fileno") and os.isatty(sys.stdin.fileno()):
                     self.termios.tcsetattr(
                         sys.stdin, self.termios.TCSADRAIN, self.old_settings
                     )
@@ -88,87 +92,138 @@ class SimpleQuizDisplay:
         self.input_handler = SimpleInput()
 
     def clear_screen(self):
-        os.system("clear")
-        sys.stdout.flush()
+        # Use Rich's console clear - works across terminals
+        self.console.clear()
 
     def render_question(
-        self, question: dict, current: int, total: int, time_remaining: int, paused: bool = False, hidden: bool = False
+        self,
+        question: dict,
+        current: int,
+        total: int,
+        time_remaining: int,
+        time_per_question: int = 30,
+        paused: bool = False,
+        hidden: bool = False,
     ):
         q_text = question["question_text"]
         options = question.get("options")
+
         self.clear_screen()
 
-        # Build header with status indicators
-        status_parts = [f"QUESTION {current}/{total}"]
+        # Time-based styling
+        if time_remaining <= 5:
+            time_style = "bold red blink"
+            bar_color = "red"
+            border_style = "red"
+        elif time_remaining <= 10:
+            time_style = "bold #FFA500 blink"
+            bar_color = "#FFA500"
+            border_style = "#FFA500"
+        else:
+            time_style = "bold yellow" if paused else "bold cyan"
+            bar_color = "yellow" if paused else "cyan"
+            border_style = "yellow" if paused else "cyan"
+
+        # Progress bar
+        term_width = shutil.get_terminal_size().columns
+        # Account for panel borders + padding (6 chars) and the label on the right
+        label = f" {chr(0xF252)} {time_remaining:>3}s"
+        prefix = f"{chr(0xF05F)} {current}/{total}  "
+        bar_area_width = term_width - 6 - len(label) - len(prefix)
+        bar_area_width = max(bar_area_width, 10)
+        ratio = time_remaining / time_per_question if time_per_question > 0 else 0
+        ratio = max(0.0, min(1.0, ratio))
+        filled = int(bar_area_width * ratio)
+        empty = bar_area_width - filled
+
+        bar_line = Text()
+        bar_line.append(prefix, style=time_style)
+        bar_line.append("\u2588" * filled, style=bar_color)
+        bar_line.append("\u2591" * empty, style="dim")
+        bar_line.append(label, style=time_style)
+
+        from rich.console import Group
+
         if paused:
-            status_parts.append("PAUSED")
-        status_parts.append(f"TIME: {time_remaining}s")
-        header = " | ".join(status_parts)
+            paused_line = Align.center(Text(f"{chr(0xF28C)} PAUSED", style="bold yellow"))
+            panel_content = Group(bar_line, paused_line)
+        else:
+            panel_content = bar_line
 
-        header_style = "bold yellow" if paused else "bold cyan"
-        border_style = "yellow" if paused else "cyan"
-
+        # Header Panel
         self.console.print(
             Panel(
-                Text(header, style=header_style),
+                panel_content,
                 box=box.ROUNDED,
                 border_style=border_style,
                 padding=(0, 1),
             )
         )
-        self.console.print()
 
         if hidden:
-            # Show minimal interface when hidden
             self.console.print(
                 Panel(
                     Text("[INTERFACE HIDDEN - Press H to show]", style="bold yellow"),
                     box=box.ROUNDED,
                     border_style="yellow",
-                    padding=(1, 2),
+                    padding=(1, 1),
                 )
             )
         else:
+            # Question Panel - NO width, auto-size
             self.console.print(
                 Panel(
-                    Text(q_text, style="bold white on_black"),
-                    title="[QUESTION]",
+                    Text(q_text, style="bold white"),
+                    title=f"{chr(0xF07E)} [QUESTION]",
                     border_style="cyan",
                     padding=(0, 1),
                 )
             )
-            self.console.print()
+
+            # Options table - auto-fit, centered
             if options:
-                options_table = Table(
-                    show_header=False, box=box.SIMPLE, border_style="cyan", padding=(0, 1)
+                opt_table = Table(
+                    show_header=False,
+                    box=box.SIMPLE,
+                    border_style="cyan",
+                    padding=(0, 1),
                 )
-                options_table.add_column("Key", style="bold cyan", width=6)
-                options_table.add_column("Option", style="bold white")
+                opt_table.add_column("Key", style="bold cyan", width=6)
+                opt_table.add_column("Option", style="bold white")
                 for i, opt in enumerate(options, 1):
-                    key = chr(64 + i)
-                    options_table.add_row(f"[{key}]", opt)
-                self.console.print(Align.center(options_table))
-                self.console.print()
+                    opt_table.add_row(f"[{chr(64 + i)}]", opt)
+                self.console.print(Align.center(opt_table))
             else:
                 self.console.print(
-                    Panel(
-                        Text("(Write your answer on paper)", style="dim"),
-                        box=box.SIMPLE,
-                        border_style="dim",
-                        padding=(0, 1),
+                    Align.center(
+                        Panel(
+                            Text("(Think your answer carefully!)", style="dim"),
+                            box=box.SIMPLE,
+                            border_style="dim",
+                            padding=(0, 1),
+                        )
                     )
                 )
-                self.console.print()
 
-        # Show pause instruction in status bar
-        pause_hint = " [P=Resume]" if paused else ""
+        # Navigation - with color-coded icons (fa-regular)
+        nav = Text()
+        nav.append(f"{chr(0xF362)} ", style="blue")  # fa-circle-left (Prev)
+        nav.append("R=Prev ", style="white")
+        nav.append(f"{chr(0xF363)} ", style="blue")  # fa-circle-right (Next)
+        nav.append("N=Next ", style="white")
+        nav.append(f"{chr(0xF070)} ", style="dim")  # fa-eye-slash (Hide)
+        nav.append("H=Hide ", style="white")
+        nav.append(f"{chr(0xF28C)} ", style="yellow")  # fa-circle-pause (Pause)
+        nav.append("P=Pause ", style="white")
+        nav.append(f"{chr(0xF058)} ", style="green")  # fa-circle-check (Finish)
+        nav.append("F=Finish ", style="white")
+        nav.append(f"{chr(0xF05E)} ", style="red")  # fa-circle-xmark (Quit)
+        nav.append("Q=Quit", style="white")
+
         self.console.print(
             Align.center(
                 Panel(
-                    Text(
-                        f"R=Prev N=Next 1-9=Jump H=Hide P=Pause F=Finish Q=Quit{pause_hint}",
-                        style="bold cyan",
-                    ),
+                    nav,
                     box=box.SIMPLE,
                     border_style="dim",
                     padding=(0, 1),
@@ -197,8 +252,14 @@ class SimpleQuizDisplay:
         term_width = shutil.get_terminal_size().columns
         panel_width = int(term_width * 0.8)
         panel_width = max(40, min(panel_width, int(term_width * 0.9)))
+
+        # Center the TIME'S UP message
+        times_up_text = Text()
+        times_up_text.append(f"{chr(0xF252)} ", style="bold red blink")  # fa-clock
+        times_up_text.append("TIME'S UP!", style="bold red blink")
+
         times_up_panel = Panel(
-            Text("TIME'S UP!", style="bold red blink"),
+            Align.center(times_up_text),
             box=box.ROUNDED,
             border_style="red",
             padding=(1, 2),
@@ -216,7 +277,7 @@ class SimpleQuizDisplay:
             import select
 
             # Flush any pending input to prevent double processing
-            if hasattr(select, 'select'):
+            if hasattr(select, "select"):
                 while select.select([sys.stdin], [], [], 0)[0]:
                     sys.stdin.read(1024)  # Read and discard any buffered input
 
@@ -225,7 +286,7 @@ class SimpleQuizDisplay:
 
             # Clear any remaining input that might be buffered
             # This prevents the ENTER key from being processed again
-            if hasattr(select, 'select'):
+            if hasattr(select, "select"):
                 while select.select([sys.stdin], [], [], 0)[0]:
                     try:
                         sys.stdin.read(1024)  # Read and discard any buffered input
@@ -243,6 +304,8 @@ class SimpleQuizDisplay:
                 self.input_handler.setup()
             except:
                 pass
+
+        self.clear_screen()
 
     def display_quiz(
         self,
@@ -265,21 +328,27 @@ class SimpleQuizDisplay:
             while state["timer_running"]:
                 time.sleep(1)
                 with state_lock:
-                    # Only decrement timer if not paused
-                    if state["timer_running"] and not state["paused"] and state["time_remaining"] > 0:
+                    # Only decrement timer if not paused and no action is TIME_UP
+                    if (
+                        state["timer_running"]
+                        and not state["paused"]
+                        and state["action"] != "TIME_UP"
+                        and state["time_remaining"] > 0
+                    ):
                         state["time_remaining"] -= 1
-                    elif state["timer_running"] and not state["paused"] and state["time_remaining"] == 0:
+                    elif (
+                        state["timer_running"]
+                        and not state["paused"]
+                        and state["time_remaining"] == 0
+                    ):
                         state["action"] = "TIME_UP"
                         # Clear any buffered input to prevent double processing
                         try:
-                            import sys
                             import select
 
                             # Try to flush any pending input
                             if select.select([sys.stdin], [], [], 0)[0]:
-                                sys.stdin.read(
-                                    1024
-                                )  # Read and discard any buffered input
+                                sys.stdin.read(1024)  # Read and discard any buffered input
                         except:
                             pass
 
@@ -297,7 +366,10 @@ class SimpleQuizDisplay:
                         if key_lower == "r" and state["current_index"] > 0:
                             state["current_index"] -= 1
                             state["time_remaining"] = time_per_question
-                        elif key_lower == "n" and state["current_index"] < len(questions) - 1:
+                        elif (
+                            key_lower == "n"
+                            and state["current_index"] < len(questions) - 1
+                        ):
                             state["current_index"] += 1
                             state["time_remaining"] = time_per_question
                         elif key_lower == "h":  # Hide interface functionality - also pauses timer
@@ -317,10 +389,7 @@ class SimpleQuizDisplay:
                             if 1 <= q_num <= min(9, len(questions)):
                                 state["current_index"] = q_num - 1
                                 state["time_remaining"] = time_per_question
-                        # Clear the key to prevent double processing
-                        key = None
-            except Exception as e:
-                # Handle any exceptions gracefully
+            except Exception:
                 pass
 
         timer_thread = threading.Thread(target=timer_worker, daemon=True)
@@ -332,6 +401,7 @@ class SimpleQuizDisplay:
         last_time = time_per_question + 999
         last_paused = False
         last_hidden = False
+
         try:
             while state["timer_running"]:
                 with state_lock:
@@ -342,6 +412,7 @@ class SimpleQuizDisplay:
                     action = state.get("action")
                     if action == "TIME_UP":
                         state["action"] = None
+
                 if action == "TIME_UP":
                     self.show_times_up()
                     with state_lock:
@@ -354,14 +425,20 @@ class SimpleQuizDisplay:
                         else:
                             state["timer_running"] = False
                             break
+
                 # Re-render if question, time, paused, or hidden state changed
-                if (current_index != last_index or current_time != last_time or
-                    current_paused != last_paused or current_hidden != last_hidden):
+                if (
+                    current_index != last_index
+                    or current_time != last_time
+                    or current_paused != last_paused
+                    or current_hidden != last_hidden
+                ):
                     self.render_question(
                         questions[current_index],
                         current_index + 1,
                         len(questions),
                         current_time,
+                        time_per_question=time_per_question,
                         paused=current_paused,
                         hidden=current_hidden,
                     )
@@ -369,6 +446,7 @@ class SimpleQuizDisplay:
                     last_time = current_time
                     last_paused = current_paused
                     last_hidden = current_hidden
+
                 time.sleep(0.05)
         finally:
             with state_lock:
@@ -377,6 +455,7 @@ class SimpleQuizDisplay:
                 self.input_handler.cleanup()
             except:
                 pass
+
         results = {
             "current_index": state["current_index"],
             "total_questions": len(questions),

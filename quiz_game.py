@@ -40,10 +40,10 @@ class NeuralQuizSystem:
     def show_main_menu(self):
         """Display and handle main menu."""
         options = [
-            "Display Quiz (Paper Mode)",
-            "Create New Quiz",
-            "Manage Quizzes",
-            "Exit System",
+            f"{chr(0xF05F)} Display Quiz (Paper Mode)",  # fa-regular fa-book (U+F05F)
+            f"{chr(0xF07E)} Create New Quiz",  # fa-regular fa-box-archive (U+F07E)
+            f"{chr(0xF0C6)} Manage Quizzes",  # fa-regular fa-file-lines (U+F0C6)
+            f"{chr(0xF05E)} Exit System",  # fa-regular fa-circle-xmark (U+F05E)
         ]
 
         choice = self.ui.show_menu(options, "MAIN MENU")
